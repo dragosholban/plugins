@@ -350,6 +350,19 @@ class FirebaseAuth {
     return currentUser;
   }
 
+  Future<Null> verifyPhoneNumber({
+    @required String phoneNumber,
+  }) async {
+    assert(phoneNumber != null);
+    final Map<dynamic, dynamic> data = await channel.invokeMethod(
+      'verifyPhoneNumber',
+      <String, String>{
+        'phoneNumber': phoneNumber,
+      },
+    );
+    return null;
+  }
+
   Future<Null> _callHandler(MethodCall call) async {
     switch (call.method) {
       case "onAuthStateChanged":

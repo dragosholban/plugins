@@ -7,11 +7,13 @@ package io.flutter.plugins.firebaseauth;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.util.SparseArray;
+import android.util.Log;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseException;
 import com.google.firebase.auth.*;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
@@ -20,6 +22,7 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /** Flutter plugin for Firebase Auth. */
 public class FirebaseAuthPlugin implements MethodCallHandler {
@@ -33,6 +36,7 @@ public class FirebaseAuthPlugin implements MethodCallHandler {
   private int nextHandle = 0;
 
   private static final String ERROR_REASON_EXCEPTION = "exception";
+  private static final String TAG = "FirebaseAuthPlugin";
 
   public static void registerWith(PluginRegistry.Registrar registrar) {
     MethodChannel channel =
@@ -46,6 +50,27 @@ public class FirebaseAuthPlugin implements MethodCallHandler {
     FirebaseApp.initializeApp(registrar.context());
     this.firebaseAuth = FirebaseAuth.getInstance();
   }
+
+  // Initialize phone auth callbacks
+  // [START phone_auth_callbacks]
+  private PhoneAuthProvider.OnVerificationStateChangedCallbacks phoneAuthCallbacks = new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+
+    @Override
+    public void onVerificationCompleted(PhoneAuthCredential credential) {
+      Log.d(TAG, "onVerificationCompleted:" + credential);
+    }
+
+    @Override
+    public void onVerificationFailed(FirebaseException e) {
+      Log.w(TAG, "onVerificationFailed", e);
+    }
+
+    @Override
+    public void onCodeSent(String verificationId, PhoneAuthProvider.ForceResendingToken token) {
+      Log.d(TAG, "onCodeSent:" + verificationId);
+    }
+  };
+  // [END phone_auth_callbacks]
 
   @Override
   public void onMethodCall(MethodCall call, Result result) {
@@ -109,6 +134,9 @@ public class FirebaseAuthPlugin implements MethodCallHandler {
         break;
       case "stopListeningAuthState":
         handleStopListeningAuthState(call, result);
+        break;
+      case "verifyPhoneNumber":
+        handleVerifyPhoneNumeber(call, result);
         break;
       default:
         result.notImplemented();
@@ -356,6 +384,20 @@ public class FirebaseAuthPlugin implements MethodCallHandler {
           String.format("Listener with identifier '%d' not found.", id),
           null);
     }
+  }
+
+  private void handleVerifyPhoneNumeber(MethodCall call, Result result) {
+    Map<String, String> arguments = (Map<String, String>) call.arguments;
+    String phoneNumber = arguments.get("phoneNumber");
+
+    PhoneAuthProvider.getInstance().verifyPhoneNumber(
+            phoneNumber,        // Phone number to verify
+            60,                 // Timeout duration
+            TimeUnit.SECONDS,   // Unit of timeout
+            registrar.activity(),               // Activity (for callback binding)
+            phoneAuthCallbacks);        // OnVerificationStateChangedCallbacks
+
+    result.success(null);
   }
 
   private class SignInCompleteListener implements OnCompleteListener<AuthResult> {
